@@ -1,15 +1,13 @@
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.dependencies import Input, Output, ClientsideFunction
+from dash.dependencies import Input, Output
 
-import numpy as np
 import pandas as pd
-import datetime
 from datetime import datetime as dt
 import pathlib
 
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import plotly.express as px
@@ -150,6 +148,46 @@ def generate_clustering_plot_teams(data_season):
 
     return fig
 
+def generate_clustering_plot_teams_gaussian_mixture(data_season):
+    key = data_season + ' Football Team Stats'
+    df_index = DATA_TITLES.index(key)
+    df_numeric, squads = DFS[df_index]
+
+    # Standardize and Normalize the data
+    scaler = MinMaxScaler()  # Using MinMaxScaler for normalization
+    df_scaled = scaler.fit_transform(df_numeric)
+
+    # PCA
+    pca = PCA(n_components=2)  # Reduce to 2 dimensions for visualization
+    principal_components = pca.fit_transform(df_scaled)
+    principal_df = pd.DataFrame(data=principal_components, columns=['PC1', 'PC2'])
+
+    # Silhouette Score Analysis
+    range_n_clusters = list(range(3, 11))
+    silhouette_avg = []
+
+    for num_clusters in range_n_clusters:
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init='auto')
+        cluster_labels = kmeans.fit_predict(principal_df)
+        silhouette_avg.append(silhouette_score(principal_df, cluster_labels))
+
+    # Choose the optimal number of clusters
+    optimal_clusters = range_n_clusters[silhouette_avg.index(max(silhouette_avg))]
+    print("Optimal number of clusters:", optimal_clusters)
+
+    # KMeans Clustering with Optimal Clusters
+    kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
+    principal_df['Cluster'] = kmeans.fit_predict(principal_df[['PC1', 'PC2']])
+
+    # Add the team names back for visualization
+    principal_df['Team'] = squads
+
+    # Plot using Plotly
+    fig = px.scatter(principal_df, x='PC1', y='PC2', color='Cluster', hover_data=['Team'])
+    fig.update_layout(title='PCA and Clustering of Football Team Stats with Team Names on Hover')
+
+    return fig
+
 def generate_clustering_plot_players(data_season):
     key = data_season + ' Football Player Stats'
     df_index = DATA_TITLES.index(key)
@@ -207,6 +245,23 @@ def generate_clustering_plot(data_type, data_season):
     MEMOIZED_FIGS[key + '/km'] = fig
     return fig
 
+def generate_clustering_plot_gaussian_mixture(data_type, data_season):
+    if data_type == None or data_season == None:
+        return px.scatter()
+    key = data_season + ' ' + data_type
+    if key+'/km' in MEMOIZED_FIGS.keys():
+        return MEMOIZED_FIGS[key+'/km']
+    
+    fig = None
+    if 'Team' in data_type:
+        fig = generate_clustering_plot_teams_gaussian_mixture(data_season)
+    else:
+        fig = generate_clustering_plot_players(data_season)
+
+    # for optimization
+    MEMOIZED_FIGS[key + '/km'] = fig
+    return fig
+
 def generate_correlation_heatmap(data_type, data_season):
     if data_type == None or data_season == None:
         return px.imshow()
@@ -227,51 +282,6 @@ def generate_correlation_heatmap(data_type, data_season):
     
     MEMOIZED_FIGS[key + '/cor'] = fig
     return fig
-
-
-
-"""
-================================================================
-"""
-
-clinic_list = df["Clinic Name"].unique()
-df["Admit Source"] = df["Admit Source"].fillna("Not Identified")
-admit_list = df["Admit Source"].unique().tolist()
-
-# Date
-# Format checkin Time
-df["Check-In Time"] = df["Check-In Time"].apply(
-    lambda x: dt.strptime(x, "%Y-%m-%d %I:%M:%S %p")
-)  # String -> Datetime
-
-# Insert weekday and hour of checkin time
-df["Days of Wk"] = df["Check-In Hour"] = df["Check-In Time"]
-df["Days of Wk"] = df["Days of Wk"].apply(
-    lambda x: dt.strftime(x, "%A")
-)  # Datetime -> weekday string
-
-df["Check-In Hour"] = df["Check-In Hour"].apply(
-    lambda x: dt.strftime(x, "%I %p")
-)  # Datetime -> int(hour) + AM/PM
-
-day_list = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday",
-]
-
-check_in_duration = df["Check-In Time"].describe()
-
-# Register all departments for callbacks
-all_departments = df["Department"].unique().tolist()
-wait_time_inputs = [
-    Input((i + "_wait_time_graph"), "selectedData") for i in all_departments
-]
-score_inputs = [Input((i + "_score_graph"), "selectedData") for i in all_departments]
 
 
 def description_card():
@@ -328,30 +338,6 @@ def generate_control_card():
                     value=[0, 20]
                 )
             ]),
-            html.Br(),
-            html.P("Select Check-In Time"),
-            dcc.DatePickerRange(
-                id="date-picker-select",
-                start_date=dt(2014, 1, 1),
-                end_date=dt(2014, 1, 15),
-                min_date_allowed=dt(2014, 1, 1),
-                max_date_allowed=dt(2014, 12, 31),
-                initial_visible_month=dt(2014, 1, 1),
-            ),
-            html.Br(),
-            html.Br(),
-            html.P("Select Admit Source"),
-            dcc.Dropdown(
-                id="admit-select",
-                options=[{"label": i, "value": i} for i in admit_list],
-                value=admit_list[:],
-                multi=True,
-            ),
-            html.Br(),
-            html.Div(
-                id="reset-btn-outer",
-                children=html.Button(id="reset-btn", children="Reset", n_clicks=0),
-            ),
         ],
     )
 
@@ -374,6 +360,18 @@ def update_correlation_heatmap(data_type, data_season):
 )
 def update_clustering_plot(data_type, data_season):
     return generate_clustering_plot(data_type, data_season)
+
+@app.callback(
+    Output("football_gaussian_misxture", "figure"),
+    [
+        Input("data-type-select", "value"),
+        Input("data-season-select", "value"),
+    ],
+)
+def update_clustering_plot_gaussian_mixture(data_type, data_season):
+    return px.scatter()
+    # return generate_clustering_plot_gaussian_mixture(data_type, data_season)
+
 
 
 app.layout = html.Div(
@@ -411,18 +409,26 @@ app.layout = html.Div(
                     ],
                 ),
                 html.Div(
+                    id="football_guassian_card",
+                    children=[
+                        html.B("Gaussian Misxture"),
+                        html.Hr(),
+                        dcc.Graph(id="football_gaussian_misxture"),
+                    ],
+                ),
+                html.Div(
                     id="football_correlation_card",
                     children=[
                         html.B("Correlation Heatmap"),
                         html.Hr(),
                         dcc.Graph(id="football_correlation_heatmap"),
+                        html.Hr(),
                     ],
                 ),
             ],
         ),
     ],
 )
-
 
 # Run the server
 if __name__ == "__main__":
