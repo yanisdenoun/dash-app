@@ -1,5 +1,5 @@
 # Import packages
-from dash import Dash, dcc, html, Input, Output, dash_table, dash
+from dash import Dash, dcc, html, Input, Output, dash_table, dash, callback
 from sklearn.decomposition import PCA
 import plotly.express as px
 import pandas as pd
@@ -14,15 +14,51 @@ df_football_team_22_23 = pd.read_csv('data/2022-2023 Football Team Stats.csv', e
 
 
 # Initialize the app
-app = Dash(__name__)
+# app = Dash(__name__)
 
-app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+# app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
-# App layout
+# badge = dbc.Button(
+#     [
+#         "Notifications",
+#         dbc.Badge("4", color="light", text_color="primary", className="ms-1"),
+#     ],
+#     color="primary",
+# )
+
+# # App layout
+# app.layout = html.Div([
+#     html.Div(children='My First App with Data'),
+#     dash_table.DataTable(data=df_football_player_21_22.to_dict('records'), page_size=10),
+#     badge,
+# ])
+
+
+
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+app = Dash(__name__, external_stylesheets=external_stylesheets)
+
 app.layout = html.Div([
-    html.Div(children='My First App with Data'),
-    dash_table.DataTable(data=df_football_player_21_22.to_dict('records'), page_size=10)
+    dcc.Tabs(id="tabs", value='tab-1', children=[
+        dcc.Tab(label='Clubs Dash', value='tab-1'),
+        dcc.Tab(label='Players Dash', value='tab-2'),
+    ]),
+    html.Div(id='tabs-content')
 ])
+
+@callback(Output('tabs-content', 'children'),
+              Input('tabs', 'value'))
+def render_content(tab):
+    if tab == 'tab-1':
+        return html.Div([
+            html.H3('Tab content 1')
+        ])
+    elif tab == 'tab-2':
+        return html.Div([
+            html.H3('Tab content 2')
+        ])
+
 
 
 # Run the app
