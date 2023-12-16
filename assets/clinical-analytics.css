@@ -85,14 +85,14 @@ H5, H3 {
     font-weight: bold;
 }
 
-#patient_volume_card, #wait_time_card {
+#patient_volume_card, #football_correlation_card, #football_clusters_card, #wait_time_card {
     background-color: #FFFFFF;
     padding: 1rem;
     margin: auto;
     margin-top: 20px;
 }
 
-#patient_volume_card > b, #wait_time_card > b {
+#patient_volume_card > b, #football_correlation_card > b, #football_clusters_card > b, #wait_time_card > b {
     line-height: 2.5;
 }
 
@@ -183,7 +183,7 @@ H5, H3 {
         clear: both;
     }
 
-    #patient_volume_card > b, #wait_time_card > b {
+    #patient_volume_card > b, #football_correlation_card > b, #football_clusters_card > b, #wait_time_card > b {
         line-height: 2.5;
         font-size: 13px;
         display: block;
