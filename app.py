@@ -98,6 +98,20 @@ def generate_control_card():
                 value=clinic_list[0],
             ),
             html.Br(),
+            html.P("Choose Season Or Seasons"),
+            html.Div([
+                dcc.RangeSlider(
+                    min=0,
+                    max=10,
+                    step=None,
+                    marks={
+                        0: '2021/2022',
+                        10: '2022/2023',
+                    },
+                    value=[0, 10]
+                )
+            ]),
+            html.Br(),
             html.P("Select Check-In Time"),
             dcc.DatePickerRange(
                 id="date-picker-select",
