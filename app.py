@@ -122,6 +122,21 @@ def generate_control_card():
                 value=data_season_list[0],
             ),
             html.Br(),
+            html.P("Choose Season Or Seasons"),
+            html.Div([
+                dcc.RangeSlider(
+                    min=0,
+                    max=20,
+                    step=10,
+                    marks={
+                        0: '2021',
+                        10: '2022',
+                        20: '2023',
+                    },
+                    value=[0, 20]
+                )
+            ]),
+            html.Br(),
             html.P("Select Check-In Time"),
             dcc.DatePickerRange(
                 id="date-picker-select",
