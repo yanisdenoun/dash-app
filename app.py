@@ -9,6 +9,8 @@ import datetime
 from datetime import datetime as dt
 import pathlib
 
+import matplotlib.pyplot as plt
+
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
@@ -243,8 +245,71 @@ def generate_clustering_plot_players(data_season):
     df_index = data_titles.index(key)
     df = dfs[df_index]
 
-    fig = None
-    # do pocessing and return plot
+    # Basic Cleaning and Feature Engineering
+    # Drop columns that won't be used in clustering
+    players = df['Player']
+    df.drop(['Rk', 'Player', 'Nation', 'Pos', 'Squad', 'Comp', 'Born'], axis=1, inplace=True)
+
+    # Handle any missing values
+    df.fillna(df.mean(), inplace=True)
+
+    # Select Features for Clustering
+    # Add or modify features based on domain knowledge
+    features = ['MP', 'Starts', 'Goals', 'Shots', 'SoT%', 'G/Sh', 'G/SoT', 'PasTotCmp%', 'PasTotDist', 'Assists', 'SCA', 'GCA', 'Tkl', 'Touches', 'CrdY', 'CrdR', 'AerWon%']
+    df_numeric = df[features]
+
+    # Outlier Detection and Handling (Optional)
+    # This part is highly data-specific. You might use methods like IQR or Z-score to identify and handle outliers.
+
+    # Standardize and Normalize the data
+    scaler = MinMaxScaler()  # Using MinMaxScaler for normalization
+    df_scaled = scaler.fit_transform(df_numeric)
+
+    # PCA
+    pca = PCA(n_components=2)  # Reduce to 2 dimensions for visualization
+    principal_components = pca.fit_transform(df_scaled)
+    principal_df = pd.DataFrame(data=principal_components, columns=['PC1', 'PC2'])
+
+    # Explained Variance Ratio and Cumulative Explained Variance Ratio
+    explained_variance_ratio = pca.explained_variance_ratio_
+    cumulative_variance_ratio = explained_variance_ratio.cumsum()
+
+    # Plot using Plotly
+    # fig = px.line(x=range(1, len(explained_variance_ratio) + 1), y=cumulative_variance_ratio, markers=True, title='Cumulative Explained Variance Ratio',
+    #             labels={'x': 'Number of Components', 'y': 'Cumulative Explained Variance Ratio'})
+    # fig.show()
+
+    # Silhouette Score Analysis
+    range_n_clusters = list(range(3, 11))
+    silhouette_avg = []
+
+    for num_clusters in range_n_clusters:
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+        cluster_labels = kmeans.fit_predict(principal_df)
+        silhouette_avg.append(silhouette_score(principal_df, cluster_labels))
+
+    # Plotting the Silhouette Scores
+    # plt.plot(range_n_clusters, silhouette_avg, 'bx-')
+    # plt.xlabel('Values of K')
+    # plt.ylabel('Silhouette score')
+    # plt.title('Silhouette Analysis For Optimal k')
+    # plt.show()
+
+    # Choose the optimal number of clusters
+    optimal_clusters = range_n_clusters[silhouette_avg.index(max(silhouette_avg))]
+    print("Optimal number of clusters:", optimal_clusters)
+
+    # KMeans Clustering with Optimal Clusters
+    kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
+    principal_df['Cluster'] = kmeans.fit_predict(principal_df[['PC1', 'PC2']])
+
+    # Add the player names back for visualization
+    principal_df['Player'] = players
+
+    # Plot using Plotly
+    fig = px.scatter(principal_df, x='PC1', y='PC2', color='Cluster', hover_data=['Player'])
+    fig.update_layout(title='PCA and Clustering of Football Player Stats with Player Names on Hover')
+    # fig.show()
     return fig
 
 def generate_clustering_plot(data_type, data_season):
