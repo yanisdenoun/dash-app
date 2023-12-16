@@ -9,6 +9,12 @@ import datetime
 from datetime import datetime as dt
 import pathlib
 
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+import plotly.express as px
+from sklearn.metrics import silhouette_score
+
 app = dash.Dash(
     __name__,
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
@@ -23,16 +29,17 @@ BASE_PATH = pathlib.Path(__file__).parent.resolve()
 DATA_PATH = BASE_PATH.joinpath("data").resolve()
 
 # Read data
-dataTitles = [
-    '2021-2022 Football Player Stats.csv',
-    '2022-2023 Football Player Stats.csv',
-    '2021-2022 Football Player Stats.csv',
-    '2022-2023 Football Player Stats.csv',
+data_titles = [
+    '2021-2022 Football Team Stats',
+    '2022-2023 Football Team Stats',
+    '2021-2022 Football Player Stats',
+    '2022-2023 Football Player Stats',
 ]
-dfs = [pd.read_csv(DATA_PATH.joinpath(path), encoding='ISO-8859-1', delimiter=';') for path in dataTitles]
+dfs = [pd.read_csv(DATA_PATH.joinpath(title + '.csv'), encoding='ISO-8859-1', delimiter=';') for title in data_titles]
 df = pd.read_csv(DATA_PATH.joinpath("clinical_analytics.csv.gz"))
+memoized_figs = {}
 
-data_type_list = ['Football Players', 'Football Teams']
+data_type_list = ['Football Team Stats', 'Football Player Stats']
 data_season_list = ['2021-2022', '2022-2023']
 
 clinic_list = df["Clinic Name"].unique()
@@ -162,6 +169,98 @@ def generate_control_card():
             ),
         ],
     )
+
+
+def generate_clustering_plot_teams(data_season):
+    key = data_season + ' Football Team Stats'
+    df_index = data_titles.index(key)
+    df = dfs[df_index]
+
+    squads = df['Squad']
+    df.drop(['Rk', 'Squad', 'Country', 'Top Team Scorer', 'Goalkeeper'], axis=1, inplace=True)
+
+    # Handle any missing values
+    df.fillna(df.mean(), inplace=True)
+    df['GD'] = df['GF'] - df['GA']  # Recalculating Goal Difference
+    df['Pts/MP'] = df['Pts'] / df['MP']  # Recalculating Points per Match
+
+    # Feature Engineering
+    # add or modify features based on domain knowledge
+    df['WinRate'] = df['W'] / df['MP']  # Example: Win rate
+    df['GoalDifferencePerMatch'] = df['GD'] / df['MP']  # Goal difference per match
+
+    # Select Features for Clustering
+    features = ['MP', 'WinRate', 'D', 'L', 'GF', 'GA', 'GoalDifferencePerMatch', 'Pts/MP', 'xG', 'xGA', 'xGD', 'xGD/90', 'Attendance']
+    df_numeric = df[features]
+
+    # Outlier Detection and Handling (Optional)
+    # This part is highly data-specific. You might use methods like IQR or Z-score to identify and handle outliers.
+
+    # Standardize and Normalize the data
+    scaler = MinMaxScaler()  # Using MinMaxScaler for normalization
+    df_scaled = scaler.fit_transform(df_numeric)
+
+    # PCA
+    pca = PCA(n_components=2)  # Reduce to 2 dimensions for visualization
+    principal_components = pca.fit_transform(df_scaled)
+    principal_df = pd.DataFrame(data=principal_components, columns=['PC1', 'PC2'])
+
+    # Silhouette Score Analysis
+    range_n_clusters = list(range(3, 11))
+    silhouette_avg = []
+
+    for num_clusters in range_n_clusters:
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init='auto')
+        cluster_labels = kmeans.fit_predict(principal_df)
+        silhouette_avg.append(silhouette_score(principal_df, cluster_labels))
+
+    # Plotting the Silhouette Scores
+    # plt.plot(range_n_clusters, silhouette_avg, 'bx-')
+    # plt.xlabel('Values of K')
+    # plt.ylabel('Silhouette score')
+    # plt.title('Silhouette Analysis For Optimal k')
+    # plt.show()
+
+    # Choose the optimal number of clusters
+    optimal_clusters = range_n_clusters[silhouette_avg.index(max(silhouette_avg))]
+    print("Optimal number of clusters:", optimal_clusters)
+
+    # KMeans Clustering with Optimal Clusters
+    kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
+    principal_df['Cluster'] = kmeans.fit_predict(principal_df[['PC1', 'PC2']])
+
+    # Add the team names back for visualization
+    principal_df['Team'] = squads
+
+    # Plot using Plotly
+    fig = px.scatter(principal_df, x='PC1', y='PC2', color='Cluster', hover_data=['Team'])
+    fig.update_layout(title='PCA and Clustering of Football Team Stats with Team Names on Hover')
+
+    return fig
+
+def generate_clustering_plot_players(data_season):
+    key = data_season + ' Football Player Stats'
+    df_index = data_titles.index(key)
+    df = dfs[df_index]
+
+    fig = None
+    # do pocessing and return plot
+    return fig
+
+def generate_clustering_plot(data_type, data_season):
+    key = data_season + ' ' + data_type
+    if key in memoized_figs.keys():
+        return memoized_figs[key]
+    
+    fig = None
+    if 'Team' in data_type:
+        fig = generate_clustering_plot_teams(data_season)
+    else:
+        fig = generate_clustering_plot_players(data_season)
+
+    # for optimization
+    memoized_figs[key] = fig
+    return fig
 
 
 def generate_patient_volume_heatmap(start, end, clinic, hm_click, admit_type, reset):
@@ -600,6 +699,14 @@ app.layout = html.Div(
             children=[
                 # Patient Volume Heatmap
                 html.Div(
+                    id="football_clusters_card",
+                    children=[
+                        html.B("Patient Volume"),
+                        html.Hr(),
+                        dcc.Graph(id="football_clusters_plot"),
+                    ],
+                ),
+                html.Div(
                     id="patient_volume_card",
                     children=[
                         html.B("Patient Volume"),
@@ -621,6 +728,15 @@ app.layout = html.Div(
     ],
 )
 
+@app.callback(
+    Output("football_clusters_plot", "figure"),
+    [
+        Input("data-type-select", "value"),
+        Input("data-season-select", "value"),
+    ],
+)
+def update_clustering_plot(data_type, data_season):
+    return generate_clustering_plot(data_type, data_season)
 
 @app.callback(
     Output("patient_volume_hm", "figure"),
