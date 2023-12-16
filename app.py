@@ -13,7 +13,7 @@ app = dash.Dash(
     __name__,
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
 )
-app.title = "Clinical Analytics Dashboard"
+app.title = "Football stats Analytics Dashboard"
 
 server = app.server
 app.config.suppress_callback_exceptions = True
@@ -23,7 +23,17 @@ BASE_PATH = pathlib.Path(__file__).parent.resolve()
 DATA_PATH = BASE_PATH.joinpath("data").resolve()
 
 # Read data
+dataTitles = [
+    '2021-2022 Football Player Stats.csv',
+    '2022-2023 Football Player Stats.csv',
+    '2021-2022 Football Player Stats.csv',
+    '2022-2023 Football Player Stats.csv',
+]
+dfs = [pd.read_csv(DATA_PATH.joinpath(path), encoding='ISO-8859-1', delimiter=';') for path in dataTitles]
 df = pd.read_csv(DATA_PATH.joinpath("clinical_analytics.csv.gz"))
+
+data_type_list = ['Football Players', 'Football Teams']
+data_season_list = ['2021-2022', '2022-2023']
 
 clinic_list = df["Clinic Name"].unique()
 df["Admit Source"] = df["Admit Source"].fillna("Not Identified")
@@ -73,8 +83,8 @@ def description_card():
     return html.Div(
         id="description-card",
         children=[
-            html.H5("Clinical Analytics"),
-            html.H3("Welcome to the Clinical Analytics Dashboard"),
+            html.H5("2021-2022 Football stats"),
+            html.H3("Welcome to the Football Stats Analytics Dashboard"),
             html.Div(
                 id="intro",
                 children="Explore clinic patient volume by time of day, waiting time, and care score. Click on the heatmap to visualize patient experience at different time points.",
@@ -96,6 +106,20 @@ def generate_control_card():
                 id="clinic-select",
                 options=[{"label": i, "value": i} for i in clinic_list],
                 value=clinic_list[0],
+            ),
+            html.Br(),
+            html.P("Select Data Type"),
+            dcc.Dropdown(
+                id="data-type-select",
+                options=[{"label": i, "value": i} for i in data_type_list],
+                value=data_type_list[0],
+            ),
+            html.Br(),
+            html.P("Select Season"),
+            dcc.Dropdown(
+                id="data-season-select",
+                options=[{"label": i, "value": i} for i in data_season_list],
+                value=data_season_list[0],
             ),
             html.Br(),
             html.P("Select Check-In Time"),
