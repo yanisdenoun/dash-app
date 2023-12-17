@@ -4,7 +4,6 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 
 import pandas as pd
-from datetime import datetime as dt
 import pathlib
 
 from sklearn.preprocessing import MinMaxScaler
