@@ -12,6 +12,9 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 import plotly.express as px
 from sklearn.metrics import silhouette_score
+from sklearn.mixture import GaussianMixture
+from sklearn.cluster import DBSCAN
+
 
 app = dash.Dash(
     __name__,
@@ -108,7 +111,7 @@ COLUMN_NAMES = {
 
 df = pd.read_csv(DATA_PATH.joinpath("clinical_analytics.csv.gz"))
 
-def generate_clustering_plot_teams(data_season):
+def generate_clustering_plot_teams_kmeans(data_season):
     key = data_season + ' Football Team Stats'
     df_index = DATA_TITLES.index(key)
     df_numeric, squads = DFS[df_index]
@@ -176,8 +179,12 @@ def generate_clustering_plot_teams_gaussian_mixture(data_season):
     print("Optimal number of clusters:", optimal_clusters)
 
     # KMeans Clustering with Optimal Clusters
-    kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
-    principal_df['Cluster'] = kmeans.fit_predict(principal_df[['PC1', 'PC2']])
+    # kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
+    # principal_df['Cluster'] = kmeans.fit_predict(principal_df[['PC1', 'PC2']])
+ 
+    # GMM Clustering with Optimal Clusters
+    gmm = GaussianMixture(n_components=optimal_clusters, random_state=42)
+    principal_df['Cluster'] = gmm.fit_predict(principal_df[['PC1', 'PC2']])
 
     # Add the team names back for visualization
     principal_df['Team'] = squads
@@ -188,7 +195,7 @@ def generate_clustering_plot_teams_gaussian_mixture(data_season):
 
     return fig
 
-def generate_clustering_plot_players(data_season):
+def generate_clustering_plot_players_kmeans(data_season):
     key = data_season + ' Football Player Stats'
     df_index = DATA_TITLES.index(key)
     df_numeric, players = DFS[df_index]
@@ -228,7 +235,52 @@ def generate_clustering_plot_players(data_season):
 
     return fig
 
-def generate_clustering_plot(data_type, data_season):
+def generate_clustering_plot_players_gaussian_mixture(data_season):
+    key = data_season + ' Football Player Stats'
+    df_index = DATA_TITLES.index(key)
+    df_numeric, players = DFS[df_index]
+
+    # Standardize and Normalize the data
+    scaler = MinMaxScaler()  # Using MinMaxScaler for normalization
+    df_scaled = scaler.fit_transform(df_numeric)
+
+    # PCA
+    pca = PCA(n_components=2)  # Reduce to 2 dimensions for visualization
+    principal_components = pca.fit_transform(df_scaled)
+    principal_df = pd.DataFrame(data=principal_components, columns=['PC1', 'PC2'])
+
+    # Silhouette Score Analysis
+    range_n_clusters = list(range(3, 11))
+    silhouette_avg = []
+
+    for num_clusters in range_n_clusters:
+        kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+        cluster_labels = kmeans.fit_predict(principal_df)
+        silhouette_avg.append(silhouette_score(principal_df, cluster_labels))
+
+    # Choose the optimal number of clusters
+    optimal_clusters = range_n_clusters[silhouette_avg.index(max(silhouette_avg))]
+    print("Optimal number of clusters:", optimal_clusters)
+    
+
+    # KMeans Clustering with Optimal Clusters
+    # kmeans = KMeans(n_clusters=optimal_clusters, random_state=42)
+    # principal_df['Cluster'] = kmeans.fit_predict(principal_df[['PC1', 'PC2']])
+
+    # GMM Clustering with Optimal Clusters
+    gmm = GaussianMixture(n_components=optimal_clusters, random_state=42)
+    principal_df['Cluster'] = gmm.fit_predict(principal_df[['PC1', 'PC2']])
+
+    # Add the player names back for visualization
+    principal_df['Player'] = players
+
+    # Plot using Plotly
+    fig = px.scatter(principal_df, x='PC1', y='PC2', color='Cluster', hover_data=['Player'])
+    fig.update_layout(title='PCA and Clustering of Football Player Stats with Player Names on Hover')
+
+    return fig
+
+def generate_clustering_plot_kmeans(data_type, data_season):
     if data_type == None or data_season == None:
         return px.scatter()
     key = data_season + ' ' + data_type
@@ -237,9 +289,9 @@ def generate_clustering_plot(data_type, data_season):
     
     fig = None
     if 'Team' in data_type:
-        fig = generate_clustering_plot_teams(data_season)
+        fig = generate_clustering_plot_teams_kmeans(data_season)
     else:
-        fig = generate_clustering_plot_players(data_season)
+        fig = generate_clustering_plot_players_kmeans(data_season)
 
     # for optimization
     MEMOIZED_FIGS[key + '/km'] = fig
@@ -249,17 +301,17 @@ def generate_clustering_plot_gaussian_mixture(data_type, data_season):
     if data_type == None or data_season == None:
         return px.scatter()
     key = data_season + ' ' + data_type
-    if key+'/km' in MEMOIZED_FIGS.keys():
-        return MEMOIZED_FIGS[key+'/km']
+    if key+'/gm' in MEMOIZED_FIGS.keys():
+        return MEMOIZED_FIGS[key+'/gm']
     
     fig = None
     if 'Team' in data_type:
         fig = generate_clustering_plot_teams_gaussian_mixture(data_season)
     else:
-        fig = generate_clustering_plot_players(data_season)
+        fig = generate_clustering_plot_players_gaussian_mixture(data_season)
 
     # for optimization
-    MEMOIZED_FIGS[key + '/km'] = fig
+    MEMOIZED_FIGS[key + '/gm'] = fig
     return fig
 
 def generate_correlation_heatmap(data_type, data_season):
@@ -352,14 +404,14 @@ def update_correlation_heatmap(data_type, data_season):
     return generate_correlation_heatmap(data_type, data_season)
 
 @app.callback(
-    Output("football_clusters_plot", "figure"),
+    Output("football_clusters_plot_kmeans", "figure"),
     [
         Input("data-type-select", "value"),
         Input("data-season-select", "value"),
     ],
 )
 def update_clustering_plot(data_type, data_season):
-    return generate_clustering_plot(data_type, data_season)
+    return generate_clustering_plot_kmeans(data_type, data_season)
 
 @app.callback(
     Output("football_gaussian_misxture", "figure"),
@@ -369,8 +421,8 @@ def update_clustering_plot(data_type, data_season):
     ],
 )
 def update_clustering_plot_gaussian_mixture(data_type, data_season):
-    return px.scatter()
-    # return generate_clustering_plot_gaussian_mixture(data_type, data_season)
+    # return px.scatter()
+    return generate_clustering_plot_gaussian_mixture(data_type, data_season)
 
 
 
@@ -405,7 +457,7 @@ app.layout = html.Div(
                     children=[
                         html.B("Kmeans Clusters"),
                         html.Hr(),
-                        dcc.Graph(id="football_clusters_plot"),
+                        dcc.Graph(id="football_clusters_plot_kmeans"),
                     ],
                 ),
                 html.Div(
