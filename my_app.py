@@ -347,7 +347,7 @@ def description_card():
             html.H3("Welcome to the Football Stats Analytics Dashboard"),
             html.Div(
                 id="intro",
-                children="Explore clinic patient volume by time of day, waiting time, and care score. Click on the heatmap to visualize patient experience at different time points.",
+                children="", #TODO descritption
             ),
         ],
     )
@@ -374,21 +374,6 @@ def generate_control_card():
                 options=[{"label": i, "value": i} for i in DATA_SEASON_LIST],
                 value=DATA_SEASON_LIST[0],
             ),
-            html.Br(),
-            html.P("Choose Season Or Seasons"),
-            html.Div([
-                dcc.RangeSlider(
-                    min=0,
-                    max=20,
-                    step=10,
-                    marks={
-                        0: '2021',
-                        10: '2022',
-                        20: '2023',
-                    },
-                    value=[0, 20]
-                )
-            ]),
         ],
     )
 
