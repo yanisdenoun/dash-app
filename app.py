@@ -381,7 +381,7 @@ app.layout = html.Div(
         html.Div(
             id="banner",
             className="banner",
-            children=[html.Div("Mohamed LAHYANE, Yanis DENOUN \t"), html.Div(children=[html.A("https://github.com/yanisdenoun/dash-app")])],
+            children=[html.Div("Mohamed LAHYANE, Yanis DENOUN \t"), html.Div(children=[html.A("https://github.com/yanisdenoun/dash-app", target="_blank" ,href="https://github.com/yanisdenoun/dash-app")])],
         ),
         # Left column
         html.Div(
