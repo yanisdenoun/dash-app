@@ -82,6 +82,10 @@ H5, H3 {
     text-align: justify;
 }
 
+#control-card {
+    width: 100%;
+}
+
 #control-card > p {
     font-weight: bold;
 }
