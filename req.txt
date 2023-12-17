@@ -1,0 +1,9 @@
+dash
+gunicorn
+numpy
+pandas
+datetime
+pathlib
+Flask==2.1.3
+Werkzeug==2.2.2
+scikit-learn
